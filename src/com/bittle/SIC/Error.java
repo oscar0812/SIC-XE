@@ -1,6 +1,10 @@
+package com.bittle.SIC;
+
 public class Error {
     private String description;
     private int index;
+    boolean isSet = false;
+
     Error(String description, int index){
         this.description = description;
         this.index = index;
@@ -12,6 +16,14 @@ public class Error {
 
     public int getIndex() {
         return index;
+    }
+
+    public boolean isSet() {
+        return isSet;
+    }
+
+    public void setSet(boolean set) {
+        isSet = set;
     }
 
     @Override
