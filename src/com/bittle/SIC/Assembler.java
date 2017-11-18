@@ -46,6 +46,7 @@ public class Assembler {
             new Opcode("WD", 0xDC),     // 24
     };
 
+    // hash map for symbol since lots of insertions and retrievals
     private final HashMap<String, Long> symbolTable = new HashMap<>();
 
     public Assembler(String sourceFile) {
@@ -76,7 +77,7 @@ public class Assembler {
 
                     if (!isComment(line)) {
                         if (eq(OPCODE, "END")) {
-                            System.out.println("END!");
+                            intermediateText.append("END\n\n\n\n");
                             break;
                         } else if (lineNumber == 0) {
                             // first line
@@ -85,7 +86,12 @@ public class Assembler {
                                     // no operand
                                     LOCCTR = 0x0;
                                 } else {
-                                    LOCCTR = num(OPERAND, 16);
+                                    long num = num(OPERAND, 16);
+                                    if(num<0){
+                                        System.out.println("INVALID OPERAND ON START OPCODE");
+                                    }
+                                    else
+                                        LOCCTR = num;
                                 }
                             } else {
                                 // no start on line 0
@@ -118,12 +124,12 @@ public class Assembler {
                                 if (eq(OPCODE, "WORD")) {
                                     LOCCTR += 3;
                                 } else if (eq(OPCODE, "RESB")) {
-                                    LOCCTR += num(OPERAND, 16);
+                                    LOCCTR += num(OPERAND, 10);
                                 } else if (eq(OPCODE, "RESW")) {
-                                    LOCCTR += (3 * num(OPERAND, 16));
+                                    LOCCTR += (3 * num(OPERAND, 10));
                                 } else if (eq(OPCODE, "BYTE")) {
                                     // adding wrong here, fix
-                                    LOCCTR += num(""+byteValue(OPERAND), 10);
+                                    LOCCTR += byteValue(OPERAND);
                                 } else {
                                     System.out.println("Invalid Operation Code");
                                 }
@@ -151,10 +157,18 @@ public class Assembler {
         }
     }
 
-
     public void pass2() {
-        System.out.println("LOCCTR: " + Long.toHexString(LOCCTR) +
-                ", START: " + Long.toHexString(STARTING_ADDRESS));
+        // only read from intermediate file on pass 2
+        try {
+            BufferedReader bufferedReader = getReader(INTERMEDIATE_FILE);
+            if (bufferedReader == null)
+                throw new NullPointerException("COULDN\'T OPEN FILE " + INTERMEDIATE_FILE + " FOR READING");
+
+        }catch (NullPointerException e){
+            e.printStackTrace();
+            System.out.println(e.getMessage());
+        }
+
     }
 
     private boolean isComment(String source) {
