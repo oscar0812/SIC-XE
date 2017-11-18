@@ -1,11 +1,11 @@
-package com.bittle.SIC;
+package com.bittle.SIC.utils;
 
 public class Error {
     private String description;
     private int index;
     boolean isSet = false;
 
-    Error(String description, int index){
+    public Error(String description, int index){
         this.description = description;
         this.index = index;
     }
