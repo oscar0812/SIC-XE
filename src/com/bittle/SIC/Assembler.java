@@ -6,6 +6,7 @@ import com.bittle.SIC.utils.Opcode;
 
 import java.io.*;
 import java.util.HashMap;
+import java.util.Scanner;
 import java.util.stream.IntStream;
 
 // LABEL    OPCODE  OPERAND
@@ -163,12 +164,15 @@ public class Assembler {
             intermediateText.append(getErrors());
             bufferedReader.close();
 
-            System.out.println("START: " + Long.toHexString(STARTING_ADDRESS)
+            System.out.println("STARTING ADDRESS: " + Long.toHexString(STARTING_ADDRESS)
                     + "\nPROGRAM LENGTH: " + Long.toHexString(PROGRAM_LENGTH));
+            System.out.println("INTERMEDIATE FILE CREATED...");
             write(INTERMEDIATE_FILE, intermediateText.toString());
         } catch (NullPointerException | IOException e) {
-            e.printStackTrace();
+            //e.printStackTrace();
             System.out.println(e.getMessage());
+            // exit the program, no point in going if main source can't be loaded
+            System.exit(0);
         }
     }
 
@@ -228,6 +232,8 @@ public class Assembler {
                 end = "E" + prependZero(end, 6 - end.length());
                 objectText.append(end);
                 write(OBJECT_FILE, objectText.toString());
+                System.out.println("OBJECT FILE CREATED...");
+                System.out.println("\nObject code:\n"+objectText.toString()+"\n\n");
             } else {
                 // has errors, check if last line is also error line
                 String err = getErrors(lines[0]);
@@ -238,14 +244,17 @@ public class Assembler {
                 File object = new File(OBJECT_FILE);
                 // if error found, delete object file if it exists
                 if (object.exists()) object.delete();
+                System.out.println("OBJECT FILE COULDN'T BE CREATED, LOOK AT LISTING FILE...");
             }
             write(LISTING_FILE, listingText.toString());
+            System.out.println("INTERMEDIATE FILE CREATED...");
 
         } catch (NullPointerException | IOException e) {
             e.printStackTrace();
             System.out.println(e.getMessage());
         }
 
+        System.out.println("PROGRAM FINISHED");
     }
 
     // pass 1 helper methods
@@ -411,7 +420,7 @@ public class Assembler {
         try {
             return new BufferedReader(new FileReader(new File(fileName)));
         } catch (Exception e) {
-            e.printStackTrace();
+            //e.printStackTrace();
             return null;
         }
     }
@@ -747,7 +756,10 @@ public class Assembler {
     }
 
     public static void main(String[] args) {
-        Assembler assembler = new Assembler("source.asm");
+        Scanner scanner = new Scanner(System.in);
+        System.out.print("Type in SIC asm file:\n> ");
+        String in = scanner.next().trim();
+        Assembler assembler = new Assembler(in);
         assembler.assemble();
     }
 }
