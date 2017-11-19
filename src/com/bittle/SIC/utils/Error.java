@@ -3,7 +3,7 @@ package com.bittle.SIC.utils;
 public class Error {
     private String description;
     private int index;
-    boolean isSet = false;
+    private boolean isSet = false;
 
     public Error(String description, int index){
         this.description = description;
@@ -22,7 +22,7 @@ public class Error {
         return isSet;
     }
 
-    public void setSet(boolean set) {
+    public void setFlag(boolean set) {
         isSet = set;
     }
 
