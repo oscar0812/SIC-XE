@@ -636,7 +636,7 @@ public class Assembler {
         if (empty(address) && empty(objectCode)) {
             return "\t\t\t\t" + source;
         }
-        String builder = String.format("%-7s", address) +
+        String builder = String.format("%-7s", address.toUpperCase()) +
                 String.format("%-9s", objectCode) +
                 source;
         return builder.trim();
