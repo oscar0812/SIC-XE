@@ -1,6 +1,5 @@
 package com.bittle.SIC;
 
-
 import com.bittle.SIC.utils.Error;
 import com.bittle.SIC.utils.Opcode;
 
@@ -37,10 +36,12 @@ public class Assembler {
             new Error("Missing or misplaced operand in WORD statement", 19),
             new Error("Illegal operand in WORD statement", 20),
             new Error("Missing or misplaced operand in BYTE statement", 21),
-
-            new Error("Missing Program Name", 23),
+            new Error("Missing Program Name", 22),
+            
             /* pass 2 */
-            new Error("Undefined symbol in operand ", 22),
+            new Error("Undefined symbol in operand ", 23),
+
+            
 
     };
 
@@ -125,22 +126,8 @@ public class Assembler {
                         } else if (lineNumber == 0) {
                             handleFirstLine(intermediateText, LABEL, OPCODE, OPERAND);
                         } else {
-                            intermediateText.append(Long.toHexString(LOCCTR));
-                            intermediateText.append("\n");
-                            // rest of file
-                            if (!empty(LABEL)) {
-                                addLabelToSymbolTable(LABEL);
-                            }
-                            int index = searchOpcode(OPCODE);
-                            if (index >= 0) {
-                                intermediateText.append(Long.toHexString(OPTAB[index].getHexCode()));
-                                intermediateText.append("\n");
-                                LOCCTR += 3;
-                            } else {
-                                handleSpecialOpcodes(intermediateText, OPCODE, OPERAND);
-                            }
-                            intermediateText.append(OPERAND);
-                            intermediateText.append("\n");
+                            // handle rest of source lines
+                            handlePassOne(intermediateText, LABEL, OPCODE, OPERAND);
                         }
                         lineNumber++;
                         // append any errors here
@@ -176,10 +163,6 @@ public class Assembler {
         }
     }
 
-    private String startAddress = "";
-    private boolean hasErrors = false;
-    private boolean fromRES = false;
-
     private void pass2() {
         // only read from intermediate file on pass 2, and write to object and listing files
         final String LISTING_FILE = "listing";
@@ -189,6 +172,7 @@ public class Assembler {
             if (bufferedReader == null)
                 throw new NullPointerException("COULDN\'T OPEN FILE " + INTERMEDIATE_FILE + " FOR READING");
 
+            StringBuilder startAddress = new StringBuilder();
             StringBuilder listingText = new StringBuilder();
             StringBuilder objectText = new StringBuilder();
             StringBuilder objectTextRecord = new StringBuilder();
@@ -198,6 +182,8 @@ public class Assembler {
             String[] lines = {"", "", "", "", ""};
             int lineNumber = 0;
             int MAX_WORDS = 5;
+            // put it in an array in order to be able to modify them, this or take them outside method
+            Boolean[] flags = {false, false};   // hasErrors, fromRES
 
             String line;
             while ((line = (bufferedReader.readLine())) != null) {
@@ -205,7 +191,7 @@ public class Assembler {
                 if (!isComment(line)) {
                     if (lineNumber % MAX_WORDS == 0 && lineNumber > 0) {
                         // already have lines needed
-                        handlePassTwo(lines, listingText, objectTextRecord, objectText);
+                        handlePassTwo(lines, listingText, objectTextRecord, objectText, flags, startAddress);
                     }
                     lines[lineNumber % MAX_WORDS] = line;
                     lineNumber++;
@@ -219,32 +205,19 @@ public class Assembler {
 
             // last text record once the file is read (the one before E record)
             if (objectTextRecord.length() > 0) {
-                objectText.append(textRecord(startAddress, objectTextRecord.toString()));
+                objectText.append(textRecord(startAddress.toString(), objectTextRecord.toString()));
                 objectTextRecord.setLength(0);
             }
 
-            if (lineNumber % MAX_WORDS == 0 && !hasErrors) {
+            if (lineNumber % MAX_WORDS == 0 && !flags[0]) {
                 // no errors
                 listingText.append(makeListingLine("", "", lines[0]));
-
-                // append E record to object file
-                String end = Long.toHexString(STARTING_ADDRESS);
-                end = "E" + prependZero(end, 6 - end.length());
-                objectText.append(end);
-                write(OBJECT_FILE, objectText.toString());
+                // append End record to object file
+                objectText.append(endRecord());
                 System.out.println("OBJECT FILE CREATED...");
                 System.out.println("\nObject code:\n"+objectText.toString()+"\n\n");
             } else {
-                // has errors, check if last line is also error line
-                String err = getErrors(lines[0]);
-                if (!empty(err)) {
-                    listingText.append(err);
-                    listingText.append("\n");
-                }
-                File object = new File(OBJECT_FILE);
-                // if error found, delete object file if it exists
-                if (object.exists()) object.delete();
-                System.out.println("OBJECT FILE COULDN'T BE CREATED, LOOK AT LISTING FILE...");
+                handlePassTwoErrors(lines, OBJECT_FILE, listingText);
             }
             write(LISTING_FILE, listingText.toString());
             System.out.println("INTERMEDIATE FILE CREATED...");
@@ -260,7 +233,7 @@ public class Assembler {
     // pass 1 helper methods
     private void handleFirstLine(StringBuilder intermediateText, String LABEL, String OPCODE, String OPERAND) {
         if (empty(LABEL)) {
-            ERRTAB[23].setFlag(true);
+            ERRTAB[22].setFlag(true);
         } else {
             PROGRAM_NAME = LABEL;
         }
@@ -287,8 +260,27 @@ public class Assembler {
         intermediateText.append("\n");
     }
 
-    private void addLabelToSymbolTable(String LABEL) {
-        if (isAlphaNum(LABEL) && isAlpha(LABEL.charAt(0))) {
+    private void handlePassOne(StringBuilder intermediateText, String LABEL, String OPCODE, String OPERAND){
+        intermediateText.append(Long.toHexString(LOCCTR));
+        intermediateText.append("\n");
+        // rest of file
+        if (!empty(LABEL)) {
+            addToSymTable(LABEL);
+        }
+        int index = searchOpcode(OPCODE);
+        if (index >= 0) {
+            intermediateText.append(Long.toHexString(OPTAB[index].getHexCode()));
+            intermediateText.append("\n");
+            LOCCTR += 3;
+        } else {
+            handleSpecialOpcodes(intermediateText, OPCODE, OPERAND);
+        }
+        intermediateText.append(OPERAND);
+        intermediateText.append("\n");
+    }
+
+    private void addToSymTable(String LABEL) {
+        if (isAlphaNum(LABEL) && Character.isAlphabetic(LABEL.charAt(0))) {
             // legal label
             if (!hasSymbol(LABEL)) {
                 // not in symbol table
@@ -350,16 +342,17 @@ public class Assembler {
     }
 
     // pass 2 helper methods
-    private void handlePassTwo(String[] lines, StringBuilder listingText,
-                               StringBuilder objectTextRecord, StringBuilder objectText) {
+    private void handlePassTwo(String[] lines, StringBuilder listingText, StringBuilder objectTextRecord,
+                               StringBuilder objectText, Boolean[] flags, StringBuilder startAddress) {
         String objectCode;
         String SOURCE_LINE = lines[0];
         String ADDRESS = lines[1];
         String OPCODE = lines[2];
         String OPERAND = lines[3];
         String ERRORS = lines[4];
-        if (empty(startAddress)) {
-            startAddress = ADDRESS;
+        if (startAddress.length() == 0) {
+            startAddress.setLength(0);
+            startAddress.append(ADDRESS);
         }
         if (noObjectCode(OPCODE)) {
             // these don't have an object code
@@ -374,7 +367,7 @@ public class Assembler {
             // has errors
             objectCode = "";
             ERRORS += " " + (getErrors());
-            hasErrors = true;
+            flags[0] = true;    // has errors
             text = makeListingLine(ADDRESS, "", SOURCE_LINE);
         } else {
             if (!noObjectCode(OPCODE) && !objectCode.isEmpty() && !eq(OPCODE, "BYTE")) // if has object code
@@ -393,14 +386,16 @@ public class Assembler {
         // object text check
         if (eq(OPCODE, "RESW") || eq(OPCODE, "RESB")) {
             if (objectTextRecord.length() > 0) {
-                objectText.append(textRecord(startAddress, objectTextRecord.toString()));
+                objectText.append(textRecord(startAddress.toString(), objectTextRecord.toString()));
                 objectTextRecord.setLength(0);
-                startAddress = ADDRESS;
-                fromRES = true;
+                startAddress.setLength(0);
+                startAddress.append(ADDRESS);
+                flags[1] = true;    // fromRES = true
             }
-        } else if (fromRES) {
-            startAddress = ADDRESS;
-            fromRES = false;
+        } else if (flags[1]) {      // if fromRES
+            startAddress.setLength(0);
+            startAddress.append(ADDRESS);
+            flags[1] = false;       // fromRES = false
         }
 
         if (objectTextRecord.length() + objectCode.length() < 61) {
@@ -408,12 +403,26 @@ public class Assembler {
             objectTextRecord.append(objectCode);
         } else {
             // too long, start new record
-            objectText.append(textRecord(startAddress, objectTextRecord.toString()));
+            objectText.append(textRecord(startAddress.toString(), objectTextRecord.toString()));
             objectTextRecord.setLength(0);
             objectTextRecord.append(objectCode);
-            startAddress = ADDRESS;
+            startAddress.setLength(0);
+            startAddress.append(ADDRESS);
         }
 
+    }
+
+    private void handlePassTwoErrors(String[] lines, String OBJECT_FILE, StringBuilder listingText) {
+        // has errors, check if last line is also error line
+        String err = getErrors(lines[0]);
+        if (!empty(err)) {
+            listingText.append(err);
+            listingText.append("\n");
+        }
+        File object = new File(OBJECT_FILE);
+        // if error found, delete object file if it exists
+        if (!object.exists() || object.delete())
+            System.out.println("OBJECT FILE COULDN'T BE CREATED, LOOK AT LISTING FILE...");
     }
 
     private BufferedReader getReader(String fileName) {
@@ -529,18 +538,14 @@ public class Assembler {
         if (startEmpty(source)) {
             // no label
             words[1] = broken[1];
-            if (broken.length > 2) {
-                words[2] = broken[2];
-            }
+            if (broken.length > 2) words[2] = broken[2];
 
         } else {
             // has a label
             words[0] = broken[0];
             if (broken.length > 1) {
                 words[1] = broken[1];
-                if (broken.length > 2) {
-                    words[2] = broken[2];
-                }
+                if (broken.length > 2) words[2] = broken[2];
             }
         }
 
@@ -550,23 +555,13 @@ public class Assembler {
     private boolean isAlphaNum(String source) {
         for (int x = 0; x < source.length(); x++) {
             char c = source.charAt(x);
-            if (!isAlpha(c) && !isDigit(c)) {
-                return false;
-            }
+            if (!Character.isAlphabetic(c) && !Character.isDigit(c)) return false;
         }
         return true;
     }
 
-    private boolean isAlpha(char c) {
-        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
-    }
-
     private boolean isDigit(String source) {
-        return IntStream.range(0, source.length()).allMatch(x -> isDigit(source.charAt(x)));
-    }
-
-    private boolean isDigit(char c) {
-        return c >= '0' && c <= '9';
+        return IntStream.range(0, source.length()).allMatch(x -> Character.isDigit(source.charAt(x)));
     }
 
     // symbol methods
@@ -625,9 +620,7 @@ public class Assembler {
 
     private String getErrors() {
         StringBuilder builder = new StringBuilder();
-        for (int x = 0; x < ERRTAB.length; x++) {
-            builder.append((ERRTAB[x].isSet()) ? (x + " ") : "");
-        }
+        for (int x = 0; x < ERRTAB.length; x++) builder.append((ERRTAB[x].isSet()) ? (x + " ") : "");
         return builder.toString().trim();
     }
 
@@ -713,7 +706,7 @@ public class Assembler {
                     objectCode = Long.toHexString(n);
             } else {
                 // no such symbol
-                ERRTAB[22].setFlag(true);
+                ERRTAB[23].setFlag(true);
                 return "";
             }
         } else {
@@ -738,13 +731,11 @@ public class Assembler {
 
     // object file methods
     private String headerRecord() {
+        String hex = Long.toHexString(STARTING_ADDRESS);
         String builder = "H" +
-                PROGRAM_NAME +
-                "  " +
-                prependZero(Long.toHexString(STARTING_ADDRESS),
-                        6 - Long.toHexString(STARTING_ADDRESS).length()) +
+                PROGRAM_NAME + "  " +
+                prependZero(hex, 6 - hex.length()) +
                 Long.toHexString(PROGRAM_LENGTH) + "\n";
-
         return builder.toUpperCase();
     }
 
@@ -753,6 +744,12 @@ public class Assembler {
         String length = Long.toHexString(text.length() / 2);
         length = prependZero(length, 2 - length.length());
         return ("T" + address + length + text + "\n").toUpperCase();
+    }
+
+    private String endRecord(){
+        String hex = Long.toHexString(STARTING_ADDRESS);
+        String builder = "E" + prependZero(hex, 6 - hex.length());
+        return builder.toUpperCase();
     }
 
     public static void main(String[] args) {
