@@ -1,14 +1,15 @@
 package com.bittle.SIC.utils;
 
-public class Opcode implements Comparable<Opcode>{
+public class Opcode implements Comparable<Opcode> {
     private String mnemonic;
     private int hexCode;
-    public Opcode(String mnemonic, int hexCode){
+
+    public Opcode(String mnemonic, int hexCode) {
         this.mnemonic = mnemonic;
         this.hexCode = hexCode;
     }
 
-    public String getMnemonic() {
+    private String getMnemonic() {
         return mnemonic;
     }
 
@@ -23,9 +24,9 @@ public class Opcode implements Comparable<Opcode>{
 
     @Override
     public boolean equals(Object obj) {
-        if(obj.getClass()!=getClass())
+        if (obj.getClass() != getClass())
             return false;
-        Opcode o = (Opcode)obj;
+        Opcode o = (Opcode) obj;
         return o.getMnemonic().equals(getMnemonic());
     }
 }
