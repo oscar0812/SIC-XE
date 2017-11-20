@@ -14,34 +14,31 @@ public class Assembler {
     private final String INTERMEDIATE_FILE = "intermediate";
 
     private final Error[] ERRTAB = {
-            new Error("Duplicate label", 0),
-            new Error("Illegal label", 1), /* [0] != Alpha || label != AlphaNum */
-            new Error("Missing or illegal operand on START directive", 2), /* isn't hex number or doesn't exist*/
-            new Error("Missing or illegal operand on END directive", 3),
-            new Error("Too many symbols in source program", 4), /* > 500 */
-            new Error("Program too long", 5), /* > 32768 */
-            new Error("Symbol too long", 6), /* Symbol len > 6 */
-            new Error("Illegal BYTE directive", 7), /* !c || !x || not c' || not x' */
-            new Error("BYTE character directive too long", 8), /* > 30 */
-            new Error("BYTE hex directive too long", 9), /* > 32 */
-            new Error("BYTE hex length is odd", 10),
-            new Error("First \' missing from BYTE", 11),
-            new Error("Last \' missing from BYTE", 12),
-            new Error("Missing operand", 13),
-            new Error("Invalid Operation Code", 14),
-            new Error("Missing or misplaced operand in RESW statement ", 15),
-            new Error("Illegal operand in RESW statement", 16),
-            new Error("Missing or misplaced operand in RESB statement ", 17),
-            new Error("Illegal operand in RESB statement", 18),
-            new Error("Missing or misplaced operand in WORD statement", 19),
-            new Error("Illegal operand in WORD statement", 20),
-            new Error("Missing or misplaced operand in BYTE statement", 21),
-            new Error("Missing Program Name", 22),
-            
+            new Error("Duplicate label"),
+            new Error("Illegal label"), /* [0] != Alpha || label != AlphaNum */
+            new Error("Missing or illegal operand on START directive"), /* isn't hex number or doesn't exist*/
+            new Error("Missing or illegal operand on END directive"),
+            new Error("Too many symbols in source program"), /* > 500 */
+            new Error("Program too long"), /* > 32768 */                    /* LINE 5 */
+            new Error("Symbol too long"), /* Symbol len > 6 */
+            new Error("Illegal BYTE directive"), /* !c || !x || not c' || not x' */
+            new Error("BYTE character directive too long"), /* > 30 */
+            new Error("BYTE hex directive too long"), /* > 32 */
+            new Error("BYTE hex length is odd"),                            /* LINE 10 */
+            new Error("First \' missing from BYTE"),
+            new Error("Last \' missing from BYTE"),
+            new Error("Missing operand"),
+            new Error("Invalid Operation Code"),
+            new Error("Missing or misplaced operand in RESW statement "),   /* LINE 15 */
+            new Error("Illegal operand in RESW statement"),
+            new Error("Missing or misplaced operand in RESB statement "),
+            new Error("Illegal operand in RESB statement"),
+            new Error("Missing or misplaced operand in WORD statement"),
+            new Error("Illegal operand in WORD statement"),                 /* LINE 20 */
+            new Error("Missing or misplaced operand in BYTE statement"),
+            new Error("Missing Program Name"),
             /* pass 2 */
-            new Error("Undefined symbol in operand ", 23),
-
-            
+            new Error("Undefined symbol in operand "),
 
     };
 
@@ -87,7 +84,6 @@ public class Assembler {
 
     public void assemble() {
         pass1();
-        resetErrors();
         pass2();
     }
 
@@ -176,6 +172,8 @@ public class Assembler {
             StringBuilder listingText = new StringBuilder();
             StringBuilder objectText = new StringBuilder();
             StringBuilder objectTextRecord = new StringBuilder();
+            StringBuilder[] builders = {startAddress, listingText, objectText, objectTextRecord}; /*for parameters*/
+
             objectText.append(headerRecord());
 
             // read the intermediate file every five lines
@@ -191,7 +189,7 @@ public class Assembler {
                 if (!isComment(line)) {
                     if (lineNumber % MAX_WORDS == 0 && lineNumber > 0) {
                         // already have lines needed
-                        handlePassTwo(lines, listingText, objectTextRecord, objectText, flags, startAddress);
+                        handlePassTwo(lines, flags, builders);
                     }
                     lines[lineNumber % MAX_WORDS] = line;
                     lineNumber++;
@@ -215,7 +213,7 @@ public class Assembler {
                 // append End record to object file
                 objectText.append(endRecord());
                 System.out.println("OBJECT FILE CREATED...");
-                System.out.println("\nObject code:\n"+objectText.toString()+"\n\n");
+                System.out.println("\nObject code:\n" + objectText.toString() + "\n\n");
             } else {
                 handlePassTwoErrors(lines, OBJECT_FILE, listingText);
             }
@@ -260,7 +258,7 @@ public class Assembler {
         intermediateText.append("\n");
     }
 
-    private void handlePassOne(StringBuilder intermediateText, String LABEL, String OPCODE, String OPERAND){
+    private void handlePassOne(StringBuilder intermediateText, String LABEL, String OPCODE, String OPERAND) {
         intermediateText.append(Long.toHexString(LOCCTR));
         intermediateText.append("\n");
         // rest of file
@@ -342,8 +340,12 @@ public class Assembler {
     }
 
     // pass 2 helper methods
-    private void handlePassTwo(String[] lines, StringBuilder listingText, StringBuilder objectTextRecord,
-                               StringBuilder objectText, Boolean[] flags, StringBuilder startAddress) {
+    private void handlePassTwo(String[] lines, Boolean[] flags, StringBuilder[] builders) {
+        StringBuilder startAddress = builders[0];
+        StringBuilder listingText = builders[1];
+        StringBuilder objectText = builders[2];
+        StringBuilder objectTextRecord = builders[3];
+
         String objectCode;
         String SOURCE_LINE = lines[0];
         String ADDRESS = lines[1];
@@ -746,7 +748,7 @@ public class Assembler {
         return ("T" + address + length + text + "\n").toUpperCase();
     }
 
-    private String endRecord(){
+    private String endRecord() {
         String hex = Long.toHexString(STARTING_ADDRESS);
         String builder = "E" + prependZero(hex, 6 - hex.length());
         return builder.toUpperCase();
